@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createSimpleClient } from '@/lib/supabase/simple-client';
 import { NextResponse } from 'next/server';
 
 export async function POST(
@@ -48,20 +48,19 @@ export async function POST(
       }, { status: 400 });
     }
     
-    // Initialize Supabase
-    const supabase = await createClient();
-    console.log('[UPLOAD] Supabase client created');
+    // Initialize Supabase - USING SIMPLE CLIENT WITHOUT COOKIES
+    const supabase = createSimpleClient();
+    console.log('[UPLOAD] Supabase simple client created (no cookies)');
     
     // Process base64 image
     console.log('[UPLOAD] Processing base64 image...');
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
-    const uint8Array = new Uint8Array(buffer);
     
-    console.log('[UPLOAD] Buffer size:', uint8Array.length, 'bytes');
-    console.log('[UPLOAD] Buffer size (KB):', (uint8Array.length / 1024).toFixed(2));
+    console.log('[UPLOAD] Buffer size:', buffer.length, 'bytes');
+    console.log('[UPLOAD] Buffer size (KB):', (buffer.length / 1024).toFixed(2));
     
-    if (uint8Array.length === 0) {
+    if (buffer.length === 0) {
       console.error('[UPLOAD] Empty buffer after base64 conversion');
       return NextResponse.json({ 
         error: 'Invalid image data - resulted in empty buffer' 
@@ -75,11 +74,12 @@ export async function POST(
     
     console.log('[UPLOAD] Target path:', path);
     console.log('[UPLOAD] Uploading to Supabase storage...');
+    console.log('[UPLOAD] Using Buffer directly (not Uint8Array)');
     
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage - use Buffer directly
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('villa-images')
-      .upload(path, uint8Array, {
+      .upload(path, buffer, {
         contentType: 'image/webp',
         cacheControl: '3600',
         upsert: false
@@ -126,7 +126,7 @@ export async function POST(
         property_id: parseInt(params.propertyId),
         category_id: category_id,
         url: urlData.publicUrl,
-        file_size: uint8Array.length,
+        file_size: buffer.length,
         original_filename: filename || 'image.webp',
         display_order: nextOrder,
         is_featured: false
