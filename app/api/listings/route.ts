@@ -13,7 +13,9 @@ export async function GET() {
     // Map CMS properties to listing format
     const listings = activeListings.map((property) => ({
       _id: property.id,
+      slug: property.slug, // Include slug for URL routing
       nickname: property.title,
+      location: property.location,
       address: {
         city: property.location,
         country: "Indonesia",
@@ -25,6 +27,12 @@ export async function GET() {
         basePrice: 0, // Price comes from API call
         currency: "USD",
       },
+      picture: {
+        large: property.images.find((img) => img.isMainGallery)?.url || "/placeholder.svg",
+      },
+      images: property.images
+        .filter((img) => img.isMainGallery)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
       pictures: property.images
         .filter((img) => img.isMainGallery)
         .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -36,7 +44,9 @@ export async function GET() {
       publicDescription: {
         summary: property.description,
       },
-      tags: [],
+      description: property.description,
+      featured: property.featured,
+      tags: property.featured ? ["featured"] : [],
       active: true,
     }))
 

@@ -2,15 +2,37 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { MapPin, Users, Bed, Bath } from "lucide-react"
 import Link from "next/link"
-import { getAllListings } from "@/lib/guesty-api"
+import { getCMSProperties } from "@/lib/cms-properties-data"
 
 export async function FeaturedVillas() {
   let listings = []
 
   try {
-    const allListings = await getAllListings()
-    // Show first 3 active listings as featured
-    listings = allListings.filter((listing) => listing.active).slice(0, 3)
+    const allProperties = await getCMSProperties()
+    // Show featured properties only, limit to 3
+    listings = allProperties
+      .filter((property) => property.featured && property.active)
+      .slice(0, 3)
+      .map((property) => ({
+        _id: property.id,
+        slug: property.slug,
+        nickname: property.title,
+        location: property.location,
+        address: {
+          city: property.location.split(",")[0].trim(),
+          country: "Indonesia",
+        },
+        accommodates: property.guests,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        picture: {
+          large: property.images.find((img) => img.isMainGallery)?.url || "/placeholder.svg",
+        },
+        prices: {
+          basePrice: 0,
+          currency: "USD",
+        },
+      }))
   } catch (error) {
     console.error("Failed to load featured villas:", error)
   }
@@ -30,7 +52,7 @@ export async function FeaturedVillas() {
         {listings.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {listings.map((listing) => (
-              <Link key={listing._id} href={`/villas/${listing._id}`}>
+              <Link key={listing._id} href={`/villas/${listing.slug || listing._id}`}>
                 <Card className="overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer h-full">
                   <div className="relative h-64">
                     <img

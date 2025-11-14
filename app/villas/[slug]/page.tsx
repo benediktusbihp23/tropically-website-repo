@@ -25,7 +25,7 @@ export default async function VillaDetailPage({
       property_categories (
         id,
         name,
-        property_amenities_new (
+        amenities:property_amenities_custom (
           id,
           name,
           icon
@@ -155,7 +155,7 @@ export default async function VillaDetailPage({
                       <div key={category.id}>
                         <h3 className="font-semibold mb-3 capitalize">{category.name}</h3>
                         <div className="grid grid-cols-2 gap-4">
-                          {category.property_amenities_new?.map((amenity: any) => (
+                          {category.amenities?.map((amenity: any) => (
                             <div key={amenity.id} className="flex items-center gap-3">
                               {amenity.icon && <span className="text-xl">{amenity.icon}</span>}
                               <span>{amenity.name}</span>

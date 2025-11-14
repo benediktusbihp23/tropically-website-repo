@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
         property_categories (
           id,
           name,
-          property_amenities_new (
+          amenities:property_amenities_custom (
             id,
             name,
             icon

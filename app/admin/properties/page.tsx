@@ -788,7 +788,7 @@ export default function PropertiesManagement() {
 
                           {/* Amenities in this category */}
                           <div className="space-y-2 mb-4">
-                            {category.property_amenities_new?.map((amenity: any) => (
+                            {category.amenities?.map((amenity: any) => (
                               <div
                                 key={amenity.id}
                                 className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
