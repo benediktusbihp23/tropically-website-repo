@@ -219,13 +219,7 @@ export async function getCMSProperties(): Promise<CMSProperty[]> {
 
     const { data: properties, error } = await supabase
       .from("properties")
-      .select(`
-        *,
-        gallery_images:property_gallery_images(*),
-        categorized_images:property_categorized_images(*),
-        highlights:property_highlights(*),
-        amenities:property_amenities(*)
-      `)
+      .select("*")
       .eq("is_published", true)
       .order("created_at", { ascending: false })
 
@@ -239,7 +233,26 @@ export async function getCMSProperties(): Promise<CMSProperty[]> {
       return FALLBACK_PROPERTIES
     }
 
-    return await Promise.all(properties.map(mapDatabasePropertyToCMS))
+    const propertiesWithRelations = await Promise.all(
+      properties.map(async (property) => {
+        const [gallery, categorized, highlights, amenities] = await Promise.all([
+          supabase.from("property_gallery_images").select("*").eq("property_id", property.id),
+          supabase.from("property_categorized_images").select("*").eq("property_id", property.id),
+          supabase.from("property_highlights").select("*").eq("property_id", property.id),
+          supabase.from("property_amenities").select("*").eq("property_id", property.id)
+        ])
+        
+        return {
+          ...property,
+          gallery_images: gallery.data || [],
+          categorized_images: categorized.data || [],
+          highlights: highlights.data || [],
+          amenities: amenities.data || []
+        }
+      })
+    )
+
+    return await Promise.all(propertiesWithRelations.map(mapDatabasePropertyToCMS))
   } catch (error) {
     console.log("[v0] Error fetching from Supabase, using fallback data")
     return FALLBACK_PROPERTIES
@@ -247,30 +260,130 @@ export async function getCMSProperties(): Promise<CMSProperty[]> {
 }
 
 export async function getCMSProperty(id: string): Promise<CMSProperty | null> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const { data: property, error } = await supabase
-    .from("properties")
-    .select(`
-      *,
-      gallery_images:property_gallery_images(*),
-      categorized_images:property_categorized_images(*),
-      highlights:property_highlights(*),
-      amenities:property_amenities(*)
-    `)
-    .eq("id", id)
-    .single()
+    const { data: property, error } = await supabase
+      .from("properties")
+      .select("*")
+      .eq("id", id)
+      .single()
 
-  if (error) {
-    console.error("[v0] Error fetching property:", error)
+    if (error) {
+      console.error("[v0] Error fetching property:", error)
+      return null
+    }
+
+    const [gallery, categorized, highlights, amenities] = await Promise.all([
+      supabase.from("property_gallery_images").select("*").eq("property_id", id),
+      supabase.from("property_categorized_images").select("*").eq("property_id", id),
+      supabase.from("property_highlights").select("*").eq("property_id", id),
+      supabase.from("property_amenities").select("*").eq("property_id", id)
+    ])
+
+    const fullProperty = {
+      ...property,
+      gallery_images: gallery.data || [],
+      categorized_images: categorized.data || [],
+      highlights: highlights.data || [],
+      amenities: amenities.data || []
+    }
+
+    return await mapDatabasePropertyToCMS(fullProperty)
+  } catch (error) {
+    console.error("[v0] Error in getCMSProperty:", error)
     return null
   }
-
-  return await mapDatabasePropertyToCMS(property)
 }
 
 export async function getCMSPropertyById(id: string): Promise<CMSProperty | null> {
   return getCMSProperty(id)
+}
+
+export async function getCMSPropertyBySlug(slug: string): Promise<CMSProperty | null> {
+  try {
+    const supabase = await createClient()
+
+    const isNumericId = /^\d+$/.test(slug)
+    
+    if (isNumericId) {
+      console.log("[v0] Detected numeric ID, fetching property to get slug:", slug)
+      const { data: propertyById, error: idError } = await supabase
+        .from("properties")
+        .select("slug")
+        .eq("id", slug)
+        .eq("is_published", true)
+        .maybeSingle()
+      
+      if (propertyById && propertyById.slug) {
+        console.log("[v0] Found slug for ID", slug, ":", propertyById.slug)
+        return getCMSPropertyBySlug(propertyById.slug)
+      }
+    }
+
+    const { data: property, error } = await supabase
+      .from("properties")
+      .select("*")
+      .eq("slug", slug)
+      .eq("is_published", true)
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Error fetching property by slug:", error.message)
+      return null
+    }
+
+    if (!property) {
+      console.log("[v0] No property found for slug:", slug)
+      return null
+    }
+
+    const [galleryImages, categorizedImages, highlights, categories] = await Promise.all([
+      supabase.from("property_gallery_images").select("*").eq("property_id", property.id).order("sort_order"),
+      supabase.from("property_categorized_images").select("*").eq("property_id", property.id).order("sort_order"),
+      supabase.from("property_highlights").select("*").eq("property_id", property.id).order("sort_order"),
+      supabase.from("property_categories").select("*").eq("property_id", property.id).order("display_order")
+    ])
+
+    console.log("[v0] Fetching categories for property:", property.id)
+
+    const fullProperty = {
+      ...property,
+      gallery_images: galleryImages.data || [],
+      categorized_images: categorizedImages.data || [],
+      highlights: highlights.data || [],
+    }
+
+    const mappedProperty = await mapDatabasePropertyToCMS(fullProperty)
+    
+    if (categories.data && categories.data.length > 0) {
+      const categoriesWithAmenities = await Promise.all(
+        categories.data.map(async (category: any) => {
+          const { data: amenities } = await supabase
+            .from("property_amenities_custom")
+            .select("*")
+            .eq("category_id", category.id)
+            .order("display_order", { ascending: true })
+          
+          console.log("[v0] Category", category.name, "has", amenities?.length || 0, "amenities")
+          
+          return {
+            ...category,
+            property_amenities_custom: amenities || []
+          }
+        })
+      )
+      
+      console.log("[v0] Fetched", categoriesWithAmenities.length, "categories with", categoriesWithAmenities.reduce((sum, cat) => sum + cat.property_amenities_custom.length, 0), "total amenities")
+      
+      mappedProperty.propertyCategories = categoriesWithAmenities
+    }
+    
+    return mappedProperty
+  } catch (error) {
+    console.error("[v0] Exception in getCMSPropertyBySlug:", error)
+    return null
+  }
 }
 
 export async function getAllCMSProperties(): Promise<CMSProperty[]> {
@@ -278,13 +391,7 @@ export async function getAllCMSProperties(): Promise<CMSProperty[]> {
 
   const { data: properties, error } = await supabase
     .from("properties")
-    .select(`
-      *,
-      gallery_images:property_gallery_images(*),
-      categorized_images:property_categorized_images(*),
-      highlights:property_highlights(*),
-      amenities:property_amenities(*)
-    `)
+    .select("*")
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -292,7 +399,26 @@ export async function getAllCMSProperties(): Promise<CMSProperty[]> {
     return []
   }
 
-  return await Promise.all(properties.map(mapDatabasePropertyToCMS))
+  const propertiesWithRelations = await Promise.all(
+    properties.map(async (property) => {
+      const [gallery, categorized, highlights, amenities] = await Promise.all([
+        supabase.from("property_gallery_images").select("*").eq("property_id", property.id),
+        supabase.from("property_categorized_images").select("*").eq("property_id", property.id),
+        supabase.from("property_highlights").select("*").eq("property_id", property.id),
+        supabase.from("property_amenities").select("*").eq("property_id", property.id)
+      ])
+      
+      return {
+        ...property,
+        gallery_images: gallery.data || [],
+        categorized_images: categorized.data || [],
+        highlights: highlights.data || [],
+        amenities: amenities.data || []
+      }
+    })
+  )
+
+  return await Promise.all(propertiesWithRelations.map(mapDatabasePropertyToCMS))
 }
 
 export async function updateCMSProperty(id: string, updates: Partial<CMSProperty>): Promise<void> {
@@ -330,7 +456,6 @@ export async function updateCMSProperty(id: string, updates: Partial<CMSProperty
 
     console.log("[v0] Property base data updated successfully")
 
-    // Update related data if provided
     if (updates.images) {
       console.log("[v0] Updating images...")
       await supabase.from("property_gallery_images").delete().eq("property_id", id)
@@ -453,7 +578,6 @@ export async function createCMSProperty(
     throw error
   }
 
-  // Insert images
   if (property.images && property.images.length > 0) {
     const galleryImages = property.images
       .filter((img) => img.isMainGallery)
@@ -469,7 +593,6 @@ export async function createCMSProperty(
     }
   }
 
-  // Insert highlights
   if (property.highlights && property.highlights.length > 0) {
     const highlights = property.highlights.map((h, idx) => ({
       property_id: id,
@@ -482,7 +605,6 @@ export async function createCMSProperty(
     await supabase.from("property_highlights").insert(highlights)
   }
 
-  // Insert amenities
   if (property.amenities && property.amenities.length > 0) {
     const { data: amenityItems } = await supabase
       .from("amenity_items")
@@ -520,7 +642,6 @@ export async function deleteCMSProperty(id: string): Promise<void> {
   }
 }
 
-// Helper function to map database structure to CMS structure
 async function mapDatabasePropertyToCMS(dbProperty: any): Promise<CMSProperty> {
   const galleryImages = (dbProperty.gallery_images || []).map((img: any, idx: number) => ({
     id: img.id,
@@ -592,18 +713,35 @@ async function mapDatabasePropertyToCMS(dbProperty: any): Promise<CMSProperty> {
   }
 }
 
-// Get amenity categories and items
 export async function getAmenityCategories() {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from("amenity_categories")
-    .select("*, items:amenity_items(*)")
+    .select("id, name, sort_order")
     .order("sort_order", { ascending: true })
 
   if (error) {
     console.error("[v0] Error fetching amenity categories:", error)
     return []
+  }
+
+  if (data && data.length > 0) {
+    const categoriesWithItems = await Promise.all(
+      data.map(async (category) => {
+        const { data: items } = await supabase
+          .from("amenity_items")
+          .select("*")
+          .eq("category_id", category.id)
+          .order("name", { ascending: true })
+        
+        return {
+          ...category,
+          items: items || []
+        }
+      })
+    )
+    return categoriesWithItems
   }
 
   return data

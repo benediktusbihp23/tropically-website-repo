@@ -78,7 +78,7 @@ const ToastClose = React.forwardRef<
     {...props}
   >
     <X className="h-4 w-4" />
-  </ToastPrimitives.Close>
+  </ToastClose>
 ))
 ToastClose.displayName = ToastPrimitives.Close.displayName
 

@@ -1,31 +1,13 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextResponse, NextRequest } from "next/server"
+import { getCMSPropertyBySlug } from "@/lib/cms-properties-data"
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   try {
-    const supabase = await createClient()
+    const property = await getCMSPropertyBySlug(params.slug)
 
-    const { data: property, error } = await supabase
-      .from('properties')
-      .select(`
-        *,
-        property_categories (
-          id,
-          name,
-          amenities:property_amenities_custom (
-            id,
-            name,
-            icon
-          )
-        )
-      `)
-      .eq('slug', params.slug)
-      .eq('active', true)
-      .single()
-
-    if (error || !property) {
+    if (!property) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 })
     }
 
@@ -62,6 +44,8 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       })),
       // Include guestyCode for backend API calls (not displayed on frontend)
       guestyCode: property.guestyCode,
+      // Include property-specific categories and amenities
+      propertyCategories: property.propertyCategories || [],
       // Include categorized images for display at bottom of page
       categorizedImages: property.images.filter((img) => !img.isMainGallery && img.category !== "general"),
     }

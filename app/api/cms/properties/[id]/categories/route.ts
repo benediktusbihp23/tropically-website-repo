@@ -1,46 +1,74 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    console.log("[v0] Fetching categories for property:", id)
+
+    const { data: categories, error } = await supabase
       .from("property_categories")
-      .select(`
-        *,
-        amenities:property_amenities_custom(*)
-      `)
-      .eq("property_id", params.id)
+      .select("*")
+      .eq("property_id", id)
       .order("display_order")
 
     if (error) throw error
 
-    return NextResponse.json(data || [])
+    if (categories && categories.length > 0) {
+      const categoriesWithAmenities = await Promise.all(
+        categories.map(async (category) => {
+          const { data: amenities } = await supabase
+            .from("property_amenities_custom")
+            .select("*")
+            .eq("category_id", category.id)
+            .order("display_order")
+          
+          return {
+            ...category,
+            property_amenities_new: amenities || []
+          }
+        })
+      )
+      console.log("[v0] Fetched", categoriesWithAmenities.length, "categories with", categoriesWithAmenities.reduce((sum, cat) => sum + (cat.property_amenities_new?.length || 0), 0), "total amenities")
+      return NextResponse.json(categoriesWithAmenities)
+    }
+
+    return NextResponse.json(categories || [])
   } catch (error: any) {
+    console.error("[v0] Exception in GET categories:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createClient()
     const body = await request.json()
+
+    console.log("[v0] Adding category to property:", id, body)
 
     const { data, error } = await supabase
       .from("property_categories")
       .insert({
-        property_id: params.id,
+        property_id: id,
         name: body.name,
         display_order: body.displayOrder || 0,
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error("[v0] Error adding category:", error)
+      throw error
+    }
 
+    console.log("[v0] Category added successfully:", data)
     return NextResponse.json(data)
   } catch (error: any) {
+    console.error("[v0] Exception in POST category:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

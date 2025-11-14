@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -13,19 +12,19 @@
   --tropically-cream: #f8f5f1;
   --tropically-cream-dark: #e5d5c3;
 
-  --background: oklch(0.985 0.005 85); /* Cream background */
-  --foreground: oklch(0.25 0.02 160); /* Dark green text */
-  --card: oklch(1 0 0); /* White */
+  --background: oklch(0.985 0.005 85);
+  --foreground: oklch(0.25 0.02 160);
+  --card: oklch(1 0 0);
   --card-foreground: oklch(0.25 0.02 160);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.25 0.02 160);
-  --primary: oklch(0.35 0.05 160); /* Tropically green */
+  --primary: oklch(0.35 0.05 160);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.7 0.08 55); /* Gold accent */
+  --secondary: oklch(0.7 0.08 55);
   --secondary-foreground: oklch(0.25 0.02 160);
   --muted: oklch(0.97 0.005 85);
   --muted-foreground: oklch(0.5 0.01 160);
-  --accent: oklch(0.7 0.08 55); /* Gold */
+  --accent: oklch(0.7 0.08 55);
   --accent-foreground: oklch(0.25 0.02 160);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
@@ -133,7 +132,6 @@
   }
 }
 
-/* Custom Tropically Styles */
 .text-tropically-green {
   color: #2d5f4e;
 }
@@ -152,4 +150,111 @@
 
 .border-tropically-gold {
   border-color: #d4a574;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes slideDownAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUpAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRightAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideLeftAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+[data-state="open"].animate-in {
+  animation: enter 200ms ease-out;
+}
+
+[data-state="closed"].animate-out {
+  animation: exit 200ms ease-in;
+}
+
+[data-side="top"].slide-in-from-bottom-2 {
+  animation: slideUpAndFade 200ms ease-out;
+}
+
+[data-side="bottom"].slide-in-from-top-2 {
+  animation: slideDownAndFade 200ms ease-out;
+}
+
+[data-side="left"].slide-in-from-right-2 {
+  animation: slideLeftAndFade 200ms ease-out;
+}
+
+[data-side="right"].slide-in-from-left-2 {
+  animation: slideRightAndFade 200ms ease-out;
+}
+
+.fade-in-0,
+.fade-out-0,
+.zoom-in-95,
+.zoom-out-95 {
+  /* These are handled by data-state animations above */
+}
+
+/* Hide scrollbar for carousel */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

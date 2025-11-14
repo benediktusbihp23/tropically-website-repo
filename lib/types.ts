@@ -146,10 +146,14 @@ export interface CMSProperty {
     sortOrder: number
   }>
 
-  // Property-specific amenities
-  propertyCategories: PropertyCategory[]
+  // Property-specific categories (optional field for backward compatibility)
+  propertyCategories?: PropertyCategory[]
+
+  // Fallback amenities (for properties without custom categories)
+  amenities?: string[]
 
   // Location
+  location?: string
   address: string
 
   active: boolean
@@ -207,4 +211,26 @@ export interface PropertyAmenity {
   name: string
   icon?: string
   displayOrder: number
+}
+
+// Image management types
+export interface ImageCategory {
+  id: string;
+  property_id: string;
+  name: string;
+  display_order: number;
+  created_at: string;
+  property_images?: PropertyImage[];
+}
+
+export interface PropertyImage {
+  id: string;
+  property_id: string;
+  category_id: string;
+  url: string;
+  is_featured: boolean;
+  display_order: number;
+  file_size?: number;
+  original_filename?: string;
+  created_at: string;
 }
