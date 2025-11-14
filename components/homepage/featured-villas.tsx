@@ -1,41 +1,34 @@
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MapPin, Users, Bed, Bath } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { MapPin, Users, Bed, Bath, Star, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from "next/link"
-import { getCMSProperties } from "@/lib/cms-properties-data"
+import { createClient } from "@/lib/supabase/server"
+import { FeaturedVillasCarousel } from "./featured-villas-carousel"
+
+interface Villa {
+  id: string
+  slug: string
+  title: string
+  subtitle: string
+  location: string
+  images: any[]
+  guests: number
+  bedrooms: number
+  bathrooms: number
+}
 
 export async function FeaturedVillas() {
-  let listings = []
+  const supabase = await createClient()
+  
+  const { data: featuredVillas } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('is_published', true)
+    .eq('is_featured', true)
+    .order('created_at', { ascending: false })
 
-  try {
-    const allProperties = await getCMSProperties()
-    // Show featured properties only, limit to 3
-    listings = allProperties
-      .filter((property) => property.featured && property.active)
-      .slice(0, 3)
-      .map((property) => ({
-        _id: property.id,
-        slug: property.slug,
-        nickname: property.title,
-        location: property.location,
-        address: {
-          city: property.location.split(",")[0].trim(),
-          country: "Indonesia",
-        },
-        accommodates: property.guests,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        picture: {
-          large: property.images.find((img) => img.isMainGallery)?.url || "/placeholder.svg",
-        },
-        prices: {
-          basePrice: 0,
-          currency: "USD",
-        },
-      }))
-  } catch (error) {
-    console.error("Failed to load featured villas:", error)
-  }
+  console.log('[v0] Featured villas query result:', featuredVillas?.length || 0, 'villas')
 
   return (
     <section className="py-16 bg-background">
@@ -49,56 +42,17 @@ export async function FeaturedVillas() {
           </p>
         </div>
 
-        {listings.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {listings.map((listing) => (
-              <Link key={listing._id} href={`/villas/${listing.slug || listing._id}`}>
-                <Card className="overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer h-full">
-                  <div className="relative h-64">
-                    <img
-                      src={listing.picture?.large || "/placeholder.svg?height=400&width=600&query=bali villa"}
-                      alt={listing.nickname}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold mb-2 text-foreground">{listing.nickname}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mb-4">
-                      <MapPin className="h-4 w-4" />
-                      {listing.address?.city || "Bali"}, Indonesia
-                    </p>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {listing.accommodates} guests
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Bed className="h-4 w-4" />
-                        {listing.bedrooms} beds
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Bath className="h-4 w-4" />
-                        {listing.bathrooms} baths
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-2xl font-bold text-primary">${listing.prices?.basePrice || "---"}</span>
-                        <span className="text-sm text-muted-foreground"> / night</span>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            ))}
+        {featuredVillas && featuredVillas.length > 0 ? (
+          <div className="mb-8">
+            <FeaturedVillasCarousel villas={featuredVillas} />
           </div>
         ) : (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No villas available at the moment.</p>
+            <p className="text-muted-foreground">No featured villas at the moment.</p>
           </div>
         )}
 
-        <div className="text-center">
+        <div className="text-center mt-8">
           <Link href="/villas">
             <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground h-12 px-8">
               View All Villas

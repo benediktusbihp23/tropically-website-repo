@@ -33,6 +33,8 @@ import Link from "next/link"
 import type { CMSProperty } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { RichTextEditor } from "@/components/rich-text-editor"
+import EmojiPickerButton from "@/components/EmojiPicker"
+import PropertyImagesManager from "@/components/PropertyImagesManager"
 
 export default function PropertiesManagement() {
   const [properties, setProperties] = useState<CMSProperty[]>([])
@@ -51,12 +53,29 @@ export default function PropertiesManagement() {
   const [slugWarningOpen, setSlugWarningOpen] = useState(false)
   const [pendingSlug, setPendingSlug] = useState("")
   const [featuredLimitWarning, setFeaturedLimitWarning] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filteredProperties, setFilteredProperties] = useState<CMSProperty[]>([])
   const { toast } = useToast()
 
   useEffect(() => {
     fetchProperties()
     fetchAmenities()
   }, [])
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredProperties(properties)
+    } else {
+      const query = searchQuery.toLowerCase()
+      const filtered = properties.filter(property => 
+        property.title.toLowerCase().includes(query) ||
+        property.subtitle?.toLowerCase().includes(query) ||
+        property.address?.toLowerCase().includes(query) ||
+        property.slug?.toLowerCase().includes(query)
+      )
+      setFilteredProperties(filtered)
+    }
+  }, [searchQuery, properties])
 
   const fetchProperties = async () => {
     try {
@@ -133,15 +152,31 @@ export default function PropertiesManagement() {
     setSlugWarningOpen(false)
   }
 
+  const handleActiveToggle = (checked: boolean) => {
+    if (!editingProperty) return
+
+    if (!checked && editingProperty.featured) {
+      const confirmed = confirm(
+        "Disabling Active will also disable Featured status. Continue?"
+      )
+      if (!confirmed) return
+      
+      setEditingProperty({ ...editingProperty, active: checked, featured: false })
+    } else {
+      setEditingProperty({ ...editingProperty, active: checked })
+    }
+  }
+
   const handleFeaturedToggle = (checked: boolean) => {
     if (!editingProperty) return
 
-    if (checked) {
-      const featuredCount = properties.filter((p) => p.featured && p.id !== editingProperty.id).length
-      if (featuredCount >= 10) {
-        setFeaturedLimitWarning(true)
-        return
-      }
+    if (!editingProperty.active) {
+      toast({
+        title: "Cannot Feature Inactive Property",
+        description: "Property must be Active before it can be Featured.",
+        variant: "destructive",
+      })
+      return
     }
 
     setEditingProperty({ ...editingProperty, featured: checked })
@@ -388,7 +423,7 @@ export default function PropertiesManagement() {
           <div>
             <h1 className="text-3xl font-serif font-bold mb-2">Properties Management</h1>
             <p className="text-muted-foreground">
-              Manage your villa listings and details • Featured villas: {featuredCount}/10
+              Manage your villa listings and details • Featured villas: {featuredCount}
             </p>
           </div>
           <Link href="/admin">
@@ -396,8 +431,23 @@ export default function PropertiesManagement() {
           </Link>
         </div>
 
+        <div className="mb-6">
+          <Input
+            type="text"
+            placeholder="Search by name, location, or slug..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2"
+          />
+          {searchQuery && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Found {filteredProperties.length} villa(s)
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {properties.map((property) => (
+          {filteredProperties.map((property) => (
             <Card key={property.id} className="overflow-hidden">
               <div className="relative h-48">
                 <img
@@ -448,10 +498,23 @@ export default function PropertiesManagement() {
           ))}
         </div>
 
+        {filteredProperties.length === 0 && searchQuery && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              No villas found matching "{searchQuery}"
+            </p>
+          </div>
+        )}
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Property</DialogTitle>
+              <DialogTitle className="text-2xl">Edit Property</DialogTitle>
+              {editingProperty && (
+                <DialogDescription className="text-base">
+                  {editingProperty.title}
+                </DialogDescription>
+              )}
             </DialogHeader>
 
             {editingProperty && (
@@ -464,441 +527,393 @@ export default function PropertiesManagement() {
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Slug</Label>
-                    <Input
-                      value={editingProperty.slug || ""}
-                      onChange={(e) => handleSlugChange(e.target.value)}
-                      placeholder="luxury-ocean-villa"
-                      className="font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      This slug will be used in your URL. Use lowercase letters and hyphens only.
-                    </p>
-                    {editingProperty.slug && !validateSlug(editingProperty.slug) && (
-                      <p className="text-xs text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Invalid slug format
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Guesty Code</Label>
-                    <Input
-                      value={editingProperty.guestyCode}
-                      onChange={(e) => setEditingProperty({ ...editingProperty, guestyCode: e.target.value })}
-                      placeholder="68638df190b40f00127d1322"
-                      className="font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground">Used for API calls to fetch availability and pricing</p>
-                  </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Title</Label>
-                      <Input
-                        value={editingProperty.title}
-                        onChange={(e) => setEditingProperty({ ...editingProperty, title: e.target.value })}
-                      />
+                      <Label htmlFor="active">Active Status</Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="active"
+                          checked={editingProperty.active}
+                          onCheckedChange={handleActiveToggle}
+                        />
+                        <Label htmlFor="active" className="text-sm text-muted-foreground">
+                          {editingProperty.active ? "Property is visible" : "Property is hidden"}
+                        </Label>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Property Type</Label>
-                      <Select
-                        value={editingProperty.propertyType}
-                        onValueChange={(value) => setEditingProperty({ ...editingProperty, propertyType: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Villa">Villa</SelectItem>
-                          <SelectItem value="Beach House">Beach House</SelectItem>
-                          <SelectItem value="Estate">Estate</SelectItem>
-                          <SelectItem value="Apartment">Apartment</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Subtitle</Label>
-                    <Input
-                      value={editingProperty.subtitle}
-                      onChange={(e) => setEditingProperty({ ...editingProperty, subtitle: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <RichTextEditor
-                      value={editingProperty.description}
-                      onChange={(html) => setEditingProperty({ ...editingProperty, description: html })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Use the toolbar to format text with bold, italic, and links.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Bedrooms</Label>
-                      <Input
-                        type="number"
-                        value={editingProperty.bedrooms}
-                        onChange={(e) =>
-                          setEditingProperty({
-                            ...editingProperty,
-                            bedrooms: Number.parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Bathrooms</Label>
-                      <Input
-                        type="number"
-                        value={editingProperty.bathrooms}
-                        onChange={(e) =>
-                          setEditingProperty({
-                            ...editingProperty,
-                            bathrooms: Number.parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Max Guests</Label>
-                      <Input
-                        type="number"
-                        value={editingProperty.guests}
-                        onChange={(e) =>
-                          setEditingProperty({
-                            ...editingProperty,
-                            guests: Number.parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Address</Label>
-                    <Input
-                      value={editingProperty.address || ""}
-                      onChange={(e) => setEditingProperty({ ...editingProperty, address: e.target.value })}
-                      placeholder="Ubud, Bali, Indonesia"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Longitude</Label>
-                      <Input
-                        type="number"
-                        step="0.000001"
-                        value={editingProperty.longitude || ""}
-                        onChange={(e) =>
-                          setEditingProperty({
-                            ...editingProperty,
-                            longitude: e.target.value ? Number.parseFloat(e.target.value) : undefined,
-                          })
-                        }
-                        placeholder="115.0881"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Latitude</Label>
-                      <Input
-                        type="number"
-                        step="0.000001"
-                        value={editingProperty.latitude || ""}
-                        onChange={(e) =>
-                          setEditingProperty({
-                            ...editingProperty,
-                            latitude: e.target.value ? Number.parseFloat(e.target.value) : undefined,
-                          })
-                        }
-                        placeholder="-8.4095"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      Get coordinates from Google Maps
-                    </a>
-                  </p>
-
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="flex items-center gap-6">
+                      <Label htmlFor="featured">Featured</Label>
                       <div className="flex items-center space-x-2">
                         <Switch
                           id="featured"
                           checked={editingProperty.featured}
                           onCheckedChange={handleFeaturedToggle}
+                          disabled={!editingProperty.active}
                         />
-                        <Label htmlFor="featured">Featured ({featuredCount}/10)</Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="active"
-                          checked={editingProperty.active}
-                          onCheckedChange={(checked) => setEditingProperty({ ...editingProperty, active: checked })}
-                        />
-                        <Label htmlFor="active">Active</Label>
+                        <Label htmlFor="featured" className="text-sm text-muted-foreground">
+                          {editingProperty.featured ? "Show on homepage" : "Not featured"}
+                        </Label>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Property Name</Label>
+                    <Input
+                      id="title"
+                      value={editingProperty.title}
+                      onChange={(e) =>
+                        setEditingProperty({ ...editingProperty, title: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="slug">URL Slug</Label>
+                    <Input
+                      id="slug"
+                      value={editingProperty.slug || ""}
+                      onChange={(e) => handleSlugChange(e.target.value)}
+                      placeholder="luxury-beach-villa"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Used in URL: /villas/{editingProperty.slug || "..."}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subtitle">Subtitle</Label>
+                    <Input
+                      id="subtitle"
+                      value={editingProperty.subtitle}
+                      onChange={(e) =>
+                        setEditingProperty({ ...editingProperty, subtitle: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <RichTextEditor
+                      value={editingProperty.description}
+                      onChange={(value) =>
+                        setEditingProperty({ ...editingProperty, description: value })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Input
+                        id="address"
+                        value={editingProperty.address}
+                        onChange={(e) =>
+                          setEditingProperty({ ...editingProperty, address: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={editingProperty.location || ""}
+                        onChange={(e) =>
+                          setEditingProperty({ ...editingProperty, location: e.target.value })
+                        }
+                        placeholder="Ubud, Bali"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="number"
+                        step="any"
+                        value={editingProperty.longitude || ""}
+                        onChange={(e) =>
+                          setEditingProperty({ ...editingProperty, longitude: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="115.2624"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="number"
+                        step="any"
+                        value={editingProperty.latitude || ""}
+                        onChange={(e) =>
+                          setEditingProperty({ ...editingProperty, latitude: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="-8.6500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bedrooms">Bedrooms</Label>
+                      <Input
+                        id="bedrooms"
+                        type="number"
+                        value={editingProperty.bedrooms}
+                        onChange={(e) =>
+                          setEditingProperty({
+                            ...editingProperty,
+                            bedrooms: parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bathrooms">Bathrooms</Label>
+                      <Input
+                        id="bathrooms"
+                        type="number"
+                        value={editingProperty.bathrooms}
+                        onChange={(e) =>
+                          setEditingProperty({
+                            ...editingProperty,
+                            bathrooms: parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="guests">Max Guests</Label>
+                      <Input
+                        id="guests"
+                        type="number"
+                        value={editingProperty.guests}
+                        onChange={(e) =>
+                          setEditingProperty({
+                            ...editingProperty,
+                            guests: parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="guestyCode">Guesty Property Code</Label>
+                    <Input
+                      id="guestyCode"
+                      value={editingProperty.guestyCode}
+                      onChange={(e) =>
+                        setEditingProperty({ ...editingProperty, guestyCode: e.target.value })
+                      }
+                      placeholder="Enter Guesty property ID"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Used to fetch real-time pricing and availability
+                    </p>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="highlights" className="space-y-4 mt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="showHighlights"
-                        checked={editingProperty.showHighlights}
-                        onCheckedChange={(checked) =>
-                          setEditingProperty({ ...editingProperty, showHighlights: checked })
-                        }
-                      />
-                      <Label htmlFor="showHighlights">Show highlights section on frontend</Label>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <Label>Property Highlights</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Key features that make this property stand out
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editingProperty.showHighlights !== false}
+                      onCheckedChange={(checked) =>
+                        setEditingProperty({ ...editingProperty, showHighlights: checked })
+                      }
+                    />
+                  </div>
+
+                  {editingProperty.highlights.map((highlight, index) => (
+                    <Card key={highlight.id} className="p-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <h4 className="font-medium">Highlight {index + 1}</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeHighlight(highlight.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Icon</Label>
+                          <EmojiPickerButton
+                            value={highlight.icon}
+                            onChange={(emoji) => {
+                              const highlights = editingProperty.highlights.map((h) =>
+                                h.id === highlight.id ? { ...h, icon: emoji } : h
+                              )
+                              setEditingProperty({ ...editingProperty, highlights })
+                            }}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Title</Label>
+                          <Input
+                            value={highlight.title}
+                            onChange={(e) => {
+                              const highlights = editingProperty.highlights.map((h) =>
+                                h.id === highlight.id ? { ...h, title: e.target.value } : h
+                              )
+                              setEditingProperty({ ...editingProperty, highlights })
+                            }}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            value={highlight.description}
+                            onChange={(e) => {
+                              const highlights = editingProperty.highlights.map((h) =>
+                                h.id === highlight.id ? { ...h, description: e.target.value } : h
+                              )
+                              setEditingProperty({ ...editingProperty, highlights })
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+
+                  <Button onClick={addHighlight} variant="outline" className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Highlight
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="amenities" className="space-y-4 mt-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-2">
+                      <Plus className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-amber-900">Add Category</h3>
+                        <p className="text-sm text-amber-700 mb-3">
+                          Category name (e.g., Essentials, Features)
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Category name (e.g., Essentials, Features)"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="bg-white"
+                          />
+                          <Button onClick={handleAddCategory} disabled={!newCategoryName}>
+                            Add
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {editingProperty.showHighlights && (
-                    <div className="space-y-4">
-                      {editingProperty.highlights.map((highlight, index) => (
-                        <Card key={highlight.id} className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <h4 className="font-semibold">Highlight {index + 1}</h4>
-                            <Button variant="ghost" size="sm" onClick={() => removeHighlight(highlight.id)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <Label>Icon</Label>
-                              <Select
-                                value={highlight.icon || "none"}
-                                onValueChange={(value) => {
-                                  const iconValue = value === "none" ? "" : value
-                                  const updated = editingProperty.highlights.map((h) =>
-                                    h.id === highlight.id ? { ...h, icon: iconValue } : h,
-                                  )
-                                  setEditingProperty({ ...editingProperty, highlights: updated })
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">No Icon</SelectItem>
-                                  <SelectItem value="waves">Waves (Pool)</SelectItem>
-                                  <SelectItem value="utensils">Utensils (Dining)</SelectItem>
-                                  <SelectItem value="wind">Wind (Cooling)</SelectItem>
-                                  <SelectItem value="tree">Tree (Garden)</SelectItem>
-                                  <SelectItem value="home">Home (Living)</SelectItem>
-                                  <SelectItem value="users">Users (Group)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Title</Label>
-                              <Input
-                                value={highlight.title}
-                                onChange={(e) => {
-                                  const updated = editingProperty.highlights.map((h) =>
-                                    h.id === highlight.id ? { ...h, title: e.target.value } : h,
-                                  )
-                                  setEditingProperty({ ...editingProperty, highlights: updated })
-                                }}
-                                placeholder="Infinity pool paradise"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Description</Label>
-                              <Textarea
-                                value={highlight.description}
-                                onChange={(e) => {
-                                  const updated = editingProperty.highlights.map((h) =>
-                                    h.id === highlight.id ? { ...h, description: e.target.value } : h,
-                                  )
-                                  setEditingProperty({ ...editingProperty, highlights: updated })
-                                }}
-                                placeholder="Private infinity pool with breathtaking ocean views..."
-                                rows={2}
-                              />
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-
-                      <Button variant="outline" onClick={addHighlight} className="w-full bg-transparent">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Highlight
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="amenities" className="mt-4">
                   <div className="space-y-6">
-                    {/* Add Category */}
-                    <Card className="p-4 bg-accent/30">
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add Category
-                      </h3>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Category name (e.g., Essentials, Features)"
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                        />
-                        <Button onClick={handleAddCategory}>Add</Button>
-                      </div>
-                    </Card>
+                    {propertyCategories.map((category) => (
+                      <Card key={category.id} className="p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold">{category.name}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
 
-                    {/* Categories List with Amenities */}
-                    {propertyCategories.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <p>No categories yet. Add one above to get started.</p>
-                      </div>
-                    ) : (
-                      propertyCategories.map((category) => (
-                        <Card key={category.id} className="p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-lg">{category.name}</h3>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCategory(category.id)}
+                        <div className="space-y-2 mb-4">
+                          {category.amenities?.map((amenity: any) => (
+                            <div
+                              key={amenity.id}
+                              className="flex items-center justify-between p-2 bg-background rounded"
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-
-                          {/* Amenities in this category */}
-                          <div className="space-y-2 mb-4">
-                            {category.amenities?.map((amenity: any) => (
-                              <div
-                                key={amenity.id}
-                                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                              >
-                                <div className="flex items-center gap-2">
-                                  {amenity.icon && <span className="text-xl">{amenity.icon}</span>}
-                                  <span>{amenity.name}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteAmenity(amenity.id)}
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
+                              <div className="flex items-center gap-2">
+                                {amenity.icon && <span className="text-lg">{amenity.icon}</span>}
+                                <span>{amenity.name}</span>
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Add Amenity to this Category */}
-                          <Card className="p-3 bg-accent/30">
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="Amenity name"
-                                value={category.id === selectedCategory ? newAmenityName : ""}
-                                onChange={(e) => {
-                                  setSelectedCategory(category.id)
-                                  setNewAmenityName(e.target.value)
-                                }}
-                                onFocus={() => setSelectedCategory(category.id)}
-                              />
-                              <Select
-                                value={category.id === selectedCategory ? newAmenityIcon : "none"}
-                                onValueChange={(val) => {
-                                  setSelectedCategory(category.id)
-                                  setNewAmenityIcon(val)
-                                }}
-                              >
-                                <SelectTrigger className="w-[140px]">
-                                  <SelectValue placeholder="Icon" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">No Icon</SelectItem>
-                                  <SelectItem value="🏊">🏊 Pool</SelectItem>
-                                  <SelectItem value="❄️">❄️ AC</SelectItem>
-                                  <SelectItem value="🌡️">🌡️ Heating</SelectItem>
-                                  <SelectItem value="📶">📶 WiFi</SelectItem>
-                                  <SelectItem value="🍳">🍳 Kitchen</SelectItem>
-                                  <SelectItem value="🌊">🌊 Ocean View</SelectItem>
-                                  <SelectItem value="🌾">🌾 Rice Field</SelectItem>
-                                  <SelectItem value="🏖️">🏖️ Beach</SelectItem>
-                                  <SelectItem value="🌳">🌳 Garden</SelectItem>
-                                  <SelectItem value="💨">💨 Fan</SelectItem>
-                                  <SelectItem value="🅿️">🅿️ Parking</SelectItem>
-                                  <SelectItem value="📺">📺 TV</SelectItem>
-                                  <SelectItem value="🔥">🔥 Fireplace</SelectItem>
-                                </SelectContent>
-                              </Select>
                               <Button
-                                onClick={() => {
-                                  if (selectedCategory === category.id && newAmenityName) {
-                                    handleAddAmenity()
-                                  }
-                                }}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteAmenity(amenity.id)}
                               >
-                                + Add
+                                <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
-                          </Card>
-                        </Card>
-                      ))
-                    )}
+                          ))}
+                        </div>
+
+                        <div className="bg-muted rounded-lg p-3">
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1 space-y-2">
+                              <Label className="text-sm">Amenity name</Label>
+                              <Input
+                                placeholder="Amenity name"
+                                value={selectedCategory === category.id ? newAmenityName : ""}
+                                onChange={(e) => {
+                                  setNewAmenityName(e.target.value)
+                                  setSelectedCategory(category.id)
+                                }}
+                                className="bg-white"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <EmojiPickerButton
+                                value={selectedCategory === category.id ? newAmenityIcon : ""}
+                                onChange={(emoji) => {
+                                  setNewAmenityIcon(emoji)
+                                  setSelectedCategory(category.id)
+                                }}
+                              />
+                            </div>
+                            <Button
+                              onClick={handleAddAmenity}
+                              disabled={
+                                selectedCategory !== category.id ||
+                                !newAmenityName ||
+                                !newAmenityIcon
+                              }
+                            >
+                              + Add
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="images" className="mt-4">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
-                      {editingProperty.images.map((image) => (
-                        <div key={image.id} className="relative aspect-video">
-                          <img
-                            src={image.url || "/placeholder.svg?height=400&width=600"}
-                            alt=""
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                          <Badge className="absolute top-2 left-2 text-xs">{image.category || "general"}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <PropertyImagesManager 
+                    propertyId={editingProperty.id}
+                    propertyName={editingProperty.title}
+                  />
                 </TabsContent>
               </Tabs>
             )}
 
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
               <Button onClick={handleSave} disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
               </Button>
             </div>
           </DialogContent>
@@ -923,22 +938,7 @@ export default function PropertiesManagement() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={featuredLimitWarning} onOpenChange={setFeaturedLimitWarning}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                Maximum Featured Limit Reached
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                You already have 10 featured villas. Please unfeature another villa first before featuring this one.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => setFeaturedLimitWarning(false)}>OK</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Removed the featured limit warning dialog */}
       </div>
     </div>
   )

@@ -2,11 +2,8 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { DatePickerWithAvailability } from "@/components/date-picker-with-availability"
-import { GuestSelector } from "@/components/guest-selector"
 import { MapPin, Users, Bed, Bath, Star, Share2, Heart } from 'lucide-react'
-import { createClient } from "@/lib/supabase/server"
+import { getCMSPropertyBySlug } from "@/lib/cms-properties-data"
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -15,30 +12,18 @@ export const revalidate = 0
 export default async function VillaDetailPage({
   params,
 }: {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }) {
-  const supabase = await createClient()
-  const { data: property, error } = await supabase
-    .from('properties')
-    .select(`
-      *,
-      property_categories (
-        id,
-        name,
-        amenities:property_amenities_custom (
-          id,
-          name,
-          icon
-        )
-      )
-    `)
-    .eq('slug', params.slug)
-    .eq('active', true)
-    .single()
+  const { slug } = await params
+  
+  const property = await getCMSPropertyBySlug(slug)
 
-  if (error || !property) {
+  if (!property) {
+    console.error("[v0] Property not found for slug:", slug)
     notFound()
   }
+
+  console.log("[v0] Loaded property:", property.title, "with slug:", property.slug)
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,7 +40,7 @@ export default async function VillaDetailPage({
                 className="w-full h-full object-cover"
               />
             </div>
-            {property.images?.slice(1, 5).map((img: any, index: number) => (
+            {property.images?.slice(1, 5).map((img, index) => (
               <div
                 key={img.id}
                 className={`relative overflow-hidden ${index === 1 ? 'rounded-tr-xl' : ''} ${index === 3 ? 'rounded-br-xl' : ''}`}
@@ -87,12 +72,12 @@ export default async function VillaDetailPage({
             {/* Left Content */}
             <div className="lg:col-span-2 space-y-8">
               {/* Title */}
-              <div className="border-b border-border pb-6">
+              <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                 <h1 className="text-3xl font-serif font-bold mb-3">{property.title}</h1>
                 <div className="flex items-center gap-4 text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
-                    {property.address || "Bali, Indonesia"}
+                    {property.location || "Bali, Indonesia"}
                   </span>
                   {property.featured && (
                     <span className="flex items-center gap-1">
@@ -117,9 +102,8 @@ export default async function VillaDetailPage({
                 </div>
               </div>
 
-              {/* Description with HTML rendering */}
               {property.description && (
-                <div className="border-b border-border pb-6">
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">About this place</h2>
                   <div 
                     className="text-muted-foreground leading-relaxed prose max-w-none"
@@ -129,11 +113,11 @@ export default async function VillaDetailPage({
               )}
 
               {/* Highlights */}
-              {property.highlights && property.highlights.length > 0 && property.show_highlights && (
-                <div className="border-b border-border pb-6">
+              {property.highlights && property.highlights.length > 0 && property.showHighlights && (
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">Property Highlights</h2>
                   <div className="space-y-4">
-                    {property.highlights.map((highlight: any) => (
+                    {property.highlights.map((highlight) => (
                       <div key={highlight.id} className="flex gap-3">
                         {highlight.icon && <span className="text-2xl">{highlight.icon}</span>}
                         <div>
@@ -146,16 +130,16 @@ export default async function VillaDetailPage({
                 </div>
               )}
 
-              {/* Amenities by Category */}
-              {property.property_categories && property.property_categories.length > 0 && (
-                <div className="border-b border-border pb-6">
+              {/* Amenities - Property-specific categories */}
+              {property.propertyCategories && property.propertyCategories.length > 0 && (
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">What this place offers</h2>
                   <div className="space-y-6">
-                    {property.property_categories.map((category: any) => (
+                    {property.propertyCategories.map((category: any) => (
                       <div key={category.id}>
-                        <h3 className="font-semibold mb-3 capitalize">{category.name}</h3>
+                        <h3 className="font-semibold mb-3">{category.name}</h3>
                         <div className="grid grid-cols-2 gap-4">
-                          {category.amenities?.map((amenity: any) => (
+                          {category.property_amenities_custom?.map((amenity: any) => (
                             <div key={amenity.id} className="flex items-center gap-3">
                               {amenity.icon && <span className="text-xl">{amenity.icon}</span>}
                               <span>{amenity.name}</span>
@@ -169,14 +153,16 @@ export default async function VillaDetailPage({
               )}
             </div>
 
-            {/* Booking Card - Uses guestyCode for API calls */}
             <div className="lg:col-span-1">
               <Card className="sticky top-24 p-6 shadow-xl">
                 <div className="mb-4">
                   <div className="text-2xl font-semibold">Select dates for pricing</div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Booking widget coming soon. Property code: {property.guesty_code}
+                <p className="text-sm text-muted-foreground mb-2">
+                  Real-time pricing and availability from Guesty.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Property Code: {property.guestyCode}
                 </p>
               </Card>
             </div>

@@ -11,8 +11,12 @@ interface VillaCardProps {
 export function VillaCard({ listing }: VillaCardProps) {
   const mainImage = listing.picture?.large || listing.images?.[0]?.url || "/luxury-bali-villa.jpg"
 
+  const villaLink = listing.slug ? `/villas/${listing.slug}` : `/villas/${listing._id}`
+  
+  console.log("[v0] Villa card link for", listing.nickname, ":", villaLink, "slug:", listing.slug, "id:", listing._id)
+
   return (
-    <Link href={`/villas/${listing.slug || listing._id}`}>
+    <Link href={villaLink}>
       <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer h-full group">
         <div className="relative h-72 overflow-hidden">
           <img
@@ -54,12 +58,15 @@ export function VillaCard({ listing }: VillaCardProps) {
           </div>
 
           {(listing.description || listing.publicDescription?.summary) && (
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">
-              {listing.description || listing.publicDescription?.summary}
-            </p>
+            <div 
+              className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed"
+              dangerouslySetInnerHTML={{ 
+                __html: listing.description || listing.publicDescription?.summary || '' 
+              }}
+            />
           )}
 
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
             <div>
               <span className="text-2xl font-bold text-primary">${listing.prices?.basePrice || "---"}</span>
               <span className="text-sm text-muted-foreground"> / night</span>
