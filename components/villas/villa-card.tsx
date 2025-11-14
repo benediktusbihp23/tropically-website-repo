@@ -66,7 +66,7 @@ export function VillaCard({ listing }: VillaCardProps) {
             />
           )}
 
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
             <div>
               <span className="text-2xl font-bold text-primary">${listing.prices?.basePrice || "---"}</span>
               <span className="text-sm text-muted-foreground"> / night</span>

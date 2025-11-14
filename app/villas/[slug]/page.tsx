@@ -72,7 +72,7 @@ export default async function VillaDetailPage({
             {/* Left Content */}
             <div className="lg:col-span-2 space-y-8">
               {/* Title */}
-              <div className="border-b border-border pb-6">
+              <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                 <h1 className="text-3xl font-serif font-bold mb-3">{property.title}</h1>
                 <div className="flex items-center gap-4 text-muted-foreground">
                   <span className="flex items-center gap-1">
@@ -103,7 +103,7 @@ export default async function VillaDetailPage({
               </div>
 
               {property.description && (
-                <div className="border-b border-border pb-6">
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">About this place</h2>
                   <div 
                     className="text-muted-foreground leading-relaxed prose max-w-none"
@@ -114,7 +114,7 @@ export default async function VillaDetailPage({
 
               {/* Highlights */}
               {property.highlights && property.highlights.length > 0 && property.showHighlights && (
-                <div className="border-b border-border pb-6">
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">Property Highlights</h2>
                   <div className="space-y-4">
                     {property.highlights.map((highlight) => (
@@ -132,7 +132,7 @@ export default async function VillaDetailPage({
 
               {/* Amenities - Property-specific categories */}
               {property.propertyCategories && property.propertyCategories.length > 0 && (
-                <div className="border-b border-border pb-6">
+                <div className="border-b border-gray-200 dark:border-gray-800 pb-6">
                   <h2 className="text-xl font-semibold mb-4">What this place offers</h2>
                   <div className="space-y-6">
                     {property.propertyCategories.map((category: any) => (

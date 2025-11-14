@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Save, Loader2, CheckCircle2, Settings, FileText, ImageIcon, Home } from "lucide-react"
+import { Save, Loader2, CheckCircle2, Settings, FileText, ImageIcon, Home } from 'lucide-react'
 import Link from "next/link"
 
 interface CMSContent {
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-50">
+      <header className="border-b border-gray-200 dark:border-gray-800 bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
                   </p>
                 </div>
 
-                <div className="p-4 border border-border rounded-lg">
+                <div className="p-4 border border-gray-200 dark:border-gray-800 rounded-lg">
                   <h3 className="font-semibold mb-2">What you can customize:</h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
           <TabsContent value="media" className="space-y-6">
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Media Library</h2>
-              <div className="p-8 border-2 border-dashed border-border rounded-lg text-center">
+              <div className="p-8 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-lg text-center">
                 <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-semibold mb-2">Media Management Coming Soon</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -298,7 +298,7 @@ export default function AdminDashboard() {
                   <Input value="Bali, Indonesia" className="text-base" />
                 </div>
 
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <h3 className="font-semibold mb-4">API Integration</h3>
                   <div className="space-y-4">
                     <div className="space-y-2">

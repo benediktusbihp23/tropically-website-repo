@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Minus, Plus } from "lucide-react"
+import { Minus, Plus } from 'lucide-react'
 
 interface GuestSelectorProps {
   adults: number
@@ -114,7 +114,7 @@ export function GuestSelector({
         </div>
 
         {/* Pets */}
-        <div className="flex items-center justify-between pb-6 border-b border-border">
+        <div className="flex items-center justify-between pb-6 border-b border-gray-200 dark:border-gray-800">
           <div>
             <p className="font-semibold">Pets</p>
             <p className="text-sm text-muted-foreground">Service animals welcome</p>
