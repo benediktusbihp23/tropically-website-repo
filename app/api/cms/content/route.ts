@@ -1,32 +1,37 @@
 import { NextResponse } from "next/server"
-import { getCMSContentBySection, updateCMSContent } from "@/lib/cms-helpers"
+
+const mockContent = [
+  {
+    id: "1",
+    key: "hero-title",
+    value: "Discover Paradise in Bali",
+    section: "homepage",
+    label: "Hero Title",
+  },
+  {
+    id: "2",
+    key: "hero-subtitle",
+    value: "Luxury villas and unforgettable experiences",
+    section: "homepage",
+    label: "Hero Subtitle",
+  },
+  {
+    id: "3",
+    key: "hero-cta",
+    value: "Explore Villas",
+    section: "homepage",
+    label: "Hero CTA Button",
+  },
+]
 
 export async function GET() {
-  try {
-    const homepageContent = await getCMSContentBySection("homepage")
-    return NextResponse.json(homepageContent)
-  } catch (error) {
-    console.error("[API] Failed to fetch CMS content:", error)
-    return NextResponse.json({ error: "Failed to fetch content" }, { status: 500 })
-  }
+  console.log('[CMS API] GET request received')
+  return NextResponse.json(mockContent)
 }
 
 export async function PUT(request: Request) {
-  try {
-    const body = await request.json()
-    const { updates } = body
-
-    if (!updates || !Array.isArray(updates)) {
-      return NextResponse.json({ error: "Invalid updates format" }, { status: 400 })
-    }
-
-    for (const update of updates) {
-      await updateCMSContent(update.key, update.value)
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("[API] Failed to update CMS content:", error)
-    return NextResponse.json({ error: "Failed to update content" }, { status: 500 })
-  }
+  console.log('[CMS API] PUT request received')
+  const body = await request.json()
+  console.log('[CMS API] Update:', body)
+  return NextResponse.json({ success: true })
 }
