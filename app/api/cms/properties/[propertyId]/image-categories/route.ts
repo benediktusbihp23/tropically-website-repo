@@ -1,6 +1,25 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
+export async function GET(
+  request: Request,
+  { params }: { params: { propertyId: string } }
+) {
+  const supabase = await createClient();
+  
+  const { data: categories, error } = await supabase
+    .from('image_categories')
+    .select('*')
+    .eq('property_id', params.propertyId)
+    .order('display_order', { ascending: true });
+  
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+  
+  return NextResponse.json({ categories: categories || [] });
+}
+
 export async function POST(
   request: Request,
   { params }: { params: { propertyId: string } }
