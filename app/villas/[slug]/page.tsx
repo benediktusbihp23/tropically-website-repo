@@ -33,7 +33,7 @@ export default async function VillaDetailPage({
       )
     `)
     .eq('slug', params.slug)
-    .eq('active', true)
+    .eq('is_published', true)
     .single()
 
   if (error || !property) {

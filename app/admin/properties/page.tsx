@@ -96,9 +96,21 @@ export default function PropertiesManagement() {
       if (response.ok) {
         const data = await response.json()
         setPropertyCategories(data)
+      } else {
+        console.error("Failed to fetch property categories: HTTP", response.status)
+        toast({
+          title: "Error",
+          description: "Failed to load categories. Please try again.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Failed to fetch property categories:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load categories. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -328,11 +340,14 @@ export default function PropertiesManagement() {
           title: "Success",
           description: "Category added successfully!",
         })
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to add category")
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to add category",
+        description: error.message || "Failed to add category",
         variant: "destructive",
       })
     }
