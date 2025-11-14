@@ -1,4 +1,3 @@
-import { createSimpleClient } from '@/lib/supabase/simple-client';
 import { NextResponse } from 'next/server';
 
 export async function POST(
@@ -10,7 +9,6 @@ export async function POST(
   console.log('[UPLOAD] Property ID:', params.propertyId);
   
   try {
-    // Validate content type
     const contentType = request.headers.get('content-type');
     console.log('[UPLOAD] Content-Type:', contentType);
     
@@ -21,14 +19,10 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Parse request body
     let body;
     try {
       body = await request.json();
       console.log('[UPLOAD] Body parsed successfully');
-      console.log('[UPLOAD] Has image:', !!body.image);
-      console.log('[UPLOAD] Has category_id:', !!body.category_id);
-      console.log('[UPLOAD] Filename:', body.filename);
     } catch (parseError) {
       console.error('[UPLOAD] JSON parse error:', parseError);
       return NextResponse.json({ 
@@ -39,7 +33,6 @@ export async function POST(
     
     const { image, category_id, filename } = body;
     
-    // Validate required fields
     if (!image || !category_id) {
       console.error('[UPLOAD] Missing required fields');
       return NextResponse.json({ 
@@ -48,121 +41,127 @@ export async function POST(
       }, { status: 400 });
     }
     
-    // Initialize Supabase - USING SIMPLE CLIENT WITHOUT COOKIES
-    const supabase = createSimpleClient();
-    console.log('[UPLOAD] Supabase simple client created (no cookies)');
-    
-    // Process base64 image
     console.log('[UPLOAD] Processing base64 image...');
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     
     console.log('[UPLOAD] Buffer size:', buffer.length, 'bytes');
-    console.log('[UPLOAD] Buffer size (KB):', (buffer.length / 1024).toFixed(2));
     
     if (buffer.length === 0) {
-      console.error('[UPLOAD] Empty buffer after base64 conversion');
+      console.error('[UPLOAD] Empty buffer');
       return NextResponse.json({ 
-        error: 'Invalid image data - resulted in empty buffer' 
+        error: 'Invalid image data' 
       }, { status: 400 });
     }
     
-    // Generate unique file path
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
     const path = `${params.propertyId}/${timestamp}-${random}.webp`;
     
     console.log('[UPLOAD] Target path:', path);
-    console.log('[UPLOAD] Uploading to Supabase storage...');
-    console.log('[UPLOAD] Using Buffer directly (not Uint8Array)');
+    console.log('[UPLOAD] Uploading to Supabase using REST API...');
     
-    // Upload to Supabase Storage - use Buffer directly
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('villa-images')
-      .upload(path, buffer, {
-        contentType: 'image/webp',
-        cacheControl: '3600',
-        upsert: false
-      });
+    // UPLOAD USING SUPABASE REST API DIRECTLY (bypasses SDK completely)
+    const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/villa-images/${path}`;
     
-    if (uploadError) {
-      console.error('[UPLOAD] Storage upload failed:', uploadError);
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'image/webp',
+        'Cache-Control': '3600',
+      },
+      body: buffer
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('[UPLOAD] Storage upload failed:', errorText);
       return NextResponse.json({ 
         error: 'Failed to upload to storage',
-        details: uploadError.message,
-        code: uploadError.name
+        details: errorText
       }, { status: 500 });
     }
     
+    const uploadData = await uploadResponse.json();
     console.log('[UPLOAD] ✅ Upload successful!');
-    console.log('[UPLOAD] Storage path:', uploadData.path);
+    console.log('[UPLOAD] Storage response:', uploadData);
     
     // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('villa-images')
-      .getPublicUrl(path);
+    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/villa-images/${path}`;
+    console.log('[UPLOAD] Public URL:', publicUrl);
     
-    console.log('[UPLOAD] Public URL generated:', urlData.publicUrl);
-    
-    // Get next display order
+    // Get next display order using REST API
     console.log('[UPLOAD] Calculating display order...');
-    const { data: maxOrderData } = await supabase
-      .from('property_images')
-      .select('display_order')
-      .eq('property_id', parseInt(params.propertyId))
-      .eq('category_id', category_id)
-      .order('display_order', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const orderUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/property_images?property_id=eq.${params.propertyId}&category_id=eq.${category_id}&order=display_order.desc&limit=1`;
     
-    const nextOrder = (maxOrderData?.display_order ?? -1) + 1;
+    const orderResponse = await fetch(orderUrl, {
+      headers: {
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    const orderData = await orderResponse.json();
+    const nextOrder = (orderData[0]?.display_order ?? -1) + 1;
     console.log('[UPLOAD] Next display order:', nextOrder);
     
-    // Insert into database
+    // Insert into database using REST API
     console.log('[UPLOAD] Saving to database...');
-    const { data: dbData, error: dbError } = await supabase
-      .from('property_images')
-      .insert({
+    const insertUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/property_images`;
+    
+    const dbResponse = await fetch(insertUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
         property_id: parseInt(params.propertyId),
         category_id: category_id,
-        url: urlData.publicUrl,
+        url: publicUrl,
         file_size: buffer.length,
         original_filename: filename || 'image.webp',
         display_order: nextOrder,
         is_featured: false
       })
-      .select()
-      .single();
+    });
     
-    if (dbError) {
-      console.error('[UPLOAD] Database insert failed:', dbError);
+    if (!dbResponse.ok) {
+      const errorText = await dbResponse.text();
+      console.error('[UPLOAD] Database insert failed:', errorText);
       
       // Cleanup: Delete uploaded file
       console.log('[UPLOAD] Rolling back - deleting uploaded file...');
-      await supabase.storage
-        .from('villa-images')
-        .remove([path]);
+      await fetch(uploadUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        }
+      });
       
       return NextResponse.json({ 
-        error: 'Failed to save image metadata to database',
-        details: dbError.message,
-        code: dbError.code
+        error: 'Failed to save image metadata',
+        details: errorText
       }, { status: 500 });
     }
     
+    const dbData = await dbResponse.json();
     console.log('[UPLOAD] ✅ Database record created!');
-    console.log('[UPLOAD] Image ID:', dbData.id);
+    console.log('[UPLOAD] Image ID:', dbData[0]?.id);
     console.log('[UPLOAD] =========================');
     
     return NextResponse.json({ 
       success: true, 
-      image: dbData,
+      image: dbData[0],
       message: 'Image uploaded successfully'
     });
     
   } catch (error) {
     console.error('[UPLOAD] ❌ FATAL ERROR:', error);
-    console.error('[UPLOAD] Error type:', error instanceof Error ? error.constructor.name : typeof error);
     console.error('[UPLOAD] Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.stack) {
       console.error('[UPLOAD] Stack trace:', error.stack);
