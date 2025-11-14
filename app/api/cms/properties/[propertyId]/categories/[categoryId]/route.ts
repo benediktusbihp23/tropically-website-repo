@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; categoryId: string } }
+  { params }: { params: { propertyId: string; categoryId: string } }
 ) {
   try {
     const supabase = await createClient()

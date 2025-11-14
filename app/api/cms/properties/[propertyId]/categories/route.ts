@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ propertyId: string }> }) {
   try {
-    const { id } = await params
+    const { propertyId } = await params
     const supabase = await createClient()
 
-    console.log("[v0] Fetching categories for property:", id)
+    console.log("[v0] Fetching categories for property:", propertyId)
 
     const { data: categories, error } = await supabase
       .from("property_categories")
       .select("*")
-      .eq("property_id", id)
+      .eq("property_id", propertyId)
       .order("display_order")
 
     if (error) throw error
@@ -42,18 +42,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ propertyId: string }> }) {
   try {
-    const { id } = await params
+    const { propertyId } = await params
     const supabase = await createClient()
     const body = await request.json()
 
-    console.log("[v0] Adding category to property:", id, body)
+    console.log("[v0] Adding category to property:", propertyId, body)
 
     const { data, error } = await supabase
       .from("property_categories")
       .insert({
-        property_id: id,
+        property_id: propertyId,
         name: body.name,
         display_order: body.displayOrder || 0,
       })
